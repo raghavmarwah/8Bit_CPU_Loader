@@ -1,4 +1,10 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_GFX.h>
+
+Adafruit_SSD1306 display(-1);
 
 //control pins
 #define CPU_RESET A2
@@ -13,21 +19,25 @@
 //read pins
 #define CONFIRM_BUTTON A0
 #define COUNTER_0 A1
-#define CLOCK_STOP A4
-#define PROG_MODE A5
+#define CLOCK_STOP A6
+#define PROG_MODE A7
 
 //constants
 #define PULSE_DURATION 10
 
 //variables
 int confirmButton = 0;
-bool checkProgramMode = false;
+bool programMode = false;
 
 //reset all modules
 void resetCPU(){
 	
 	//CPU reset attempt#1
-	Serial.println("\nCPU Reset Signal");
+	//Serial.println("\nCPU Reset Signal");
+	display.clearDisplay();
+	display.setCursor(0,0);
+	display.println("CPU Reset Signal");
+	//display.display();
 	digitalWrite(CPU_RESET, HIGH);
 	delay(PULSE_DURATION);
 	digitalWrite(CPU_RESET, LOW);
@@ -35,13 +45,18 @@ void resetCPU(){
 	//Check if CPU reset worked properly and repeat if necessary.
 	int resetCounter = 2;
 	while(digitalRead(COUNTER_0)){
-		Serial.println("CPU Reset Attempt#"+resetCounter);
+		//Serial.println("CPU Reset Attempt#"+resetCounter);
+		display.println("CPU Reset Attempt#"+resetCounter);
+		//display.display();
 		resetCounter++;
 		digitalWrite(CPU_RESET, HIGH);
 		delay(PULSE_DURATION);
 		digitalWrite(CPU_RESET, LOW);
 	}
-	Serial.println("CPU Reset Successful");
+	//Serial.println("CPU Reset Successful");
+	display.println("CPU Reset Successful");
+	display.display();
+	delay(900);
 }
 
 //shift 4 bits to SR2 and latch to memory address register.
@@ -59,7 +74,8 @@ void setMemoryAddress(byte address){
 			outputText = "0" + outputText;
 		address = address >> 1;
 	}
-	Serial.print(outputText+": ");
+	//Serial.print(outputText+": ");
+
 }
 
 //shift 8 bits to SR1 and latch to memory data.
@@ -77,7 +93,7 @@ void writeToRAM(byte data){
 			outputText = "0" + outputText;
 		data = data >> 1;
 	}
-	Serial.println(outputText);
+	//Serial.println(outputText);
 	pinMode(MEM_WRITE, OUTPUT);
 	digitalWrite(MEM_WRITE, LOW);
 	delay(PULSE_DURATION);
@@ -85,18 +101,21 @@ void writeToRAM(byte data){
 }
 
 void setup() {
+
+	//initialize with the I2C addr 0x3C
+	display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  
+
+	//clear the buffer.
+	display.clearDisplay();
+
+	display.setTextSize(1);
+	display.setTextColor(WHITE);
+
 	//initalize serial connection
-	Serial.begin(9600);
-	Serial.println("\n");
+	Serial.begin(115200);
+	Serial.println();
 
 	//initialize pins
-	pinMode(CPU_RESET, OUTPUT);
-	pinMode(SR1_INPUT, OUTPUT);
-	pinMode(SR2_INPUT, OUTPUT);
-	pinMode(SR1_CLOCK, OUTPUT);
-	pinMode(SR2_CLOCK, OUTPUT);
-	pinMode(SR1_LATCH, OUTPUT);
-	pinMode(SR2_LATCH, OUTPUT);
 	digitalWrite(CPU_RESET, LOW);
 	digitalWrite(SR1_INPUT, LOW);
 	digitalWrite(SR2_INPUT, LOW);
@@ -104,7 +123,14 @@ void setup() {
 	digitalWrite(SR2_CLOCK, LOW);
 	digitalWrite(SR1_LATCH, LOW);
 	digitalWrite(SR2_LATCH, LOW);
-
+	pinMode(CPU_RESET, OUTPUT);
+	pinMode(SR1_INPUT, OUTPUT);
+	pinMode(SR2_INPUT, OUTPUT);
+	pinMode(SR1_CLOCK, OUTPUT);
+	pinMode(SR2_CLOCK, OUTPUT);
+	pinMode(SR1_LATCH, OUTPUT);
+	pinMode(SR2_LATCH, OUTPUT);
+	
 	pinMode(CONFIRM_BUTTON, INPUT);
 	pinMode(MEM_WRITE, INPUT);
 	pinMode(COUNTER_0, INPUT);
@@ -113,16 +139,25 @@ void setup() {
 
 	//notify user to disable the clock and switch to programming mode.
 	//program execution will not continue unless these conditions are satisfied.
-	checkProgramMode = (analogRead(CLOCK_STOP) < 410 && analogRead(PROG_MODE) < 410) ? true : false;
-	if(!checkProgramMode)
-		Serial.println("Please switch Clock to manual and Memory to programming mode.");
-	while(!checkProgramMode){
-		checkProgramMode = (analogRead(CLOCK_STOP) < 410 && analogRead(PROG_MODE) < 410) ? true : false;
+	programMode = (analogRead(CLOCK_STOP) < 410 && analogRead(PROG_MODE) < 410) ? true : false;
+	if(!programMode){
+		//Serial.println("Please switch Clock to manual and Memory to programming mode.");
+		display.setCursor(0,0);
+		display.println("Please switch Clock\nto manual and Memory to programming mode.");
+		display.display();
+	}
+	while(!programMode){
+		programMode = (analogRead(CLOCK_STOP) < 410 && analogRead(PROG_MODE) < 410) ? true : false;
 	}
 
 	//wait for user to ensure all DIP switches are in the ON (HIGH) position. These switches
 	//are inverted in Ben's design, hence moving them to the UP position disconnects them.
-	Serial.println("Ensure ALL DIP switches are in the ON (HIGH) position. Press button to continue.");
+	
+	//Serial.println("Ensure ALL DIP switches are in the ON (HIGH) position.\nPress button to continue.");
+	display.clearDisplay();
+	display.setCursor(0,0);
+	display.println("Ensure ALL DIP\nswitches are in the\nON (HIGH) position.\n\nPress button to\ncontinue.");
+	display.display();
 
 	//loop until the user presses the button.
 	confirmButton = digitalRead(CONFIRM_BUTTON);
@@ -131,13 +166,18 @@ void setup() {
 	}
 
 	resetCPU();
+	display.clearDisplay();
+	display.setCursor(0,0);
 
 	//disable memory address dip switch input.
-	Serial.println("\nProgramming the memory");
+	//Serial.println("\nProgramming the memory");
+	display.println("Programming the\nmemory");
 	byte code[] = {224, 47, 116, 96, 63, 224, 128, 100, 0, 0, 0, 0, 0, 0, 0, 1};
 	for (int address = 0; address < 16; address++){
 		setMemoryAddress(address);
 		writeToRAM(code[address]);
+		display.print(".");
+		display.display();
 		delay(10);
 	}
 
@@ -145,10 +185,24 @@ void setup() {
 	digitalWrite(SR1_LATCH, LOW);
 	digitalWrite(SR2_LATCH, LOW);
 	resetCPU();
-	Serial.println("\nPlease switch to run mode and enable the clock...");
-	
+	//Serial.println("\nPlease switch to run mode and enable the clock...");
+
+	programMode = false;
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  	programMode = (analogRead(CLOCK_STOP) > 410 && analogRead(PROG_MODE) > 410) ? true : false;
+	if(programMode){
+		display.clearDisplay();
+		display.setCursor(40,30);
+		display.println("RUN MODE");
+		display.display();
+	}
+	else{
+		display.clearDisplay();
+		display.setCursor(0,0);
+		display.println("Please switch to run\nmode and enable the\nclock...");
+		display.display();
+	}
+	delay(100);
 }
