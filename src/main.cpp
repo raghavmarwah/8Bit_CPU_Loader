@@ -1,94 +1,83 @@
 #include <Arduino.h>
 
-// Control Pins
-#define CPU_RESET 3
-#define MEM_WRITE 4
-#define RAM_D0 5
-#define RAM_D7 12
-#define MAR_STROBE A1
-#define MAR_A0 A2
-#define MAR_A3 A5
+//control pins
+#define CPU_RESET A2
+#define MEM_WRITE A3
+#define SR1_INPUT 2
+#define SR2_INPUT 3
+#define SR1_CLOCK 4
+#define SR2_CLOCK 5
+#define SR1_LATCH 6
+#define SR2_LATCH 7
 
-//Read Pins
-#define CONFIRM_BUTTON 2
-#define COUNTER_0 A0
+//read pins
+#define CONFIRM_BUTTON A0
+#define COUNTER_0 A1
+
+//constants
+#define PULSE_DURATION 10
 
 //variables
 int confirmButton = 0;
 
 //reset all modules
-void resetCPU(int delayTime){
+void resetCPU(){
 	
 	//CPU reset attempt#1
 	Serial.println("\nCPU Reset Signal");
 	digitalWrite(CPU_RESET, HIGH);
-	delay(delayTime);
+	delay(PULSE_DURATION);
 	digitalWrite(CPU_RESET, LOW);
 
 	//Check if CPU reset worked properly and repeat if necessary
 	int resetCounter = 2;
 	while(digitalRead(COUNTER_0)){
-		Serial.print("CPU Reset Attempt#");
-		Serial.println(resetCounter);
+		Serial.println("CPU Reset Attempt#"+resetCounter);
 		resetCounter++;
 		digitalWrite(CPU_RESET, HIGH);
-		delay(delayTime);
+		delay(PULSE_DURATION);
 		digitalWrite(CPU_RESET, LOW);
 	}
 	Serial.println("CPU Reset Successful");
 }
 
-//reset pins RAM_D0 through RAM_D7 to a low impedance OUTPUT state
-void resetDataPins(){
-	for (int pin = RAM_D0; pin <= RAM_D7; pin++) {
-    	pinMode(pin, OUTPUT);
-		digitalWrite(pin, LOW);
-  	}
-}
+//shift 4 bits to SR2 and latch to memory address register
+void setMemoryAddress(byte address){
+	
+	digitalWrite(SR2_LATCH, LOW);
+	shiftOut(SR2_INPUT, SR2_CLOCK, MSBFIRST, address);
+	digitalWrite(SR2_LATCH, HIGH);
 
-//reset pins MAR_A0 through MAR_A3 to a high impedance INPUT state 
-void resetAddressPins(){
-	for (int pin = MAR_A0; pin <= MAR_A3; pin++){
-		pinMode(pin, INPUT);
-	}
-	digitalWrite(MAR_STROBE, LOW);	
-}
-
-void setMemoryAddress(int address){
 	String outputText = "";
-	for (int pin = MAR_A0; pin <= MAR_A3; pin++){
-		pinMode(pin, OUTPUT);
-		if(address & 1){
+	for (int i = 0; i < 4; i++){
+		if(address & 1)
 			outputText = "1" + outputText;
-			digitalWrite(pin, HIGH);
-		}
-		else{
+		else
 			outputText = "0" + outputText;
-			digitalWrite(pin, LOW);
-		}
 		address = address >> 1;
 	}
 	Serial.print(outputText+": ");
 }
 
-//write 8 bits to memory
+//shift 8 bits to SR1 and latch to memory data
 void writeToRAM(byte data){
+	
+	digitalWrite(SR1_LATCH, LOW);
+	shiftOut(SR1_INPUT, SR1_CLOCK, MSBFIRST, data);
+	digitalWrite(SR1_LATCH, HIGH);
+	
 	String outputText = "";
-	for (int pin = RAM_D0; pin <= RAM_D7; pin++){
-		if(data & 1){
-			outputText = "1" + outputText;
-			digitalWrite(pin, HIGH);
-		}
-		else{
+	for (int i = 0; i < 8; i++){
+		if(data & 1)
+			outputText = "1" + outputText;	
+		else
 			outputText = "0" + outputText;
-			digitalWrite(pin, LOW);
-		}
 		data = data >> 1;
 	}
 	Serial.println(outputText);
 	pinMode(MEM_WRITE, OUTPUT);
 	digitalWrite(MEM_WRITE, LOW);
-	delay(600);
+	delay(PULSE_DURATION);
 	pinMode(MEM_WRITE, INPUT);
 }
 
@@ -96,20 +85,29 @@ void setup() {
 	//initalize serial connection
 	Serial.begin(9600);
 
-	//define output pins
+	//initialize pins
 	pinMode(CPU_RESET, OUTPUT);
-	pinMode(MAR_STROBE, OUTPUT);
-	
-	//define input pins
+	pinMode(SR1_INPUT, OUTPUT);
+	pinMode(SR2_INPUT, OUTPUT);
+	pinMode(SR1_CLOCK, OUTPUT);
+	pinMode(SR2_CLOCK, OUTPUT);
+	pinMode(SR1_LATCH, OUTPUT);
+	pinMode(SR2_LATCH, OUTPUT);
+	digitalWrite(CPU_RESET, LOW);
+	digitalWrite(SR1_INPUT, LOW);
+	digitalWrite(SR2_INPUT, LOW);
+	digitalWrite(SR1_CLOCK, LOW);
+	digitalWrite(SR2_CLOCK, LOW);
+	digitalWrite(SR1_LATCH, LOW);
+	digitalWrite(SR2_LATCH, LOW);
+
 	pinMode(CONFIRM_BUTTON, INPUT);
 	pinMode(MEM_WRITE, INPUT);
 	pinMode(COUNTER_0, INPUT);
-	
-	resetAddressPins();
- 	resetDataPins();
 
+	//notify user, wait for user prompt
 	Serial.println("\n\nPlease switch Clock to manual and Memory to programming mode.");
-	Serial.println("Press button to continue.");
+	Serial.println("Ensure ALL DIP switches are in the ON (HIGH) position. Press button to continue.");
 
 	//loop until the user presses the button
 	confirmButton = digitalRead(CONFIRM_BUTTON);
@@ -117,23 +115,22 @@ void setup() {
 		confirmButton = digitalRead(CONFIRM_BUTTON);
 	}
 
-	resetCPU(600);
+	resetCPU();
 
 	//disable memory address dip switch input
 	Serial.println("\nProgramming the memory");
-	digitalWrite(MAR_STROBE, HIGH);
 	byte code[] = {224, 47, 116, 96, 63, 224, 128, 100, 0, 0, 0, 0, 0, 0, 0, 1};
 	for (int address = 0; address < 16; address++){
 		setMemoryAddress(address);
 		writeToRAM(code[address]);
-		//delay(1000);
+		delay(10);
 	}
 
-	resetDataPins();
-	resetAddressPins();
-	resetCPU(600);
-
+	digitalWrite(SR1_LATCH, LOW);
+	digitalWrite(SR2_LATCH, LOW);
+	resetCPU();
 	Serial.println("\nPlease switch to run mode and enable the clock...");
+	
 }
 
 void loop() {
