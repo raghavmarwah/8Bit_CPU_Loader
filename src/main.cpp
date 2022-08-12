@@ -13,12 +13,15 @@
 //read pins
 #define CONFIRM_BUTTON A0
 #define COUNTER_0 A1
+#define CLOCK_STOP A4
+#define PROG_MODE A5
 
 //constants
 #define PULSE_DURATION 10
 
 //variables
 int confirmButton = 0;
+bool checkProgramMode = false;
 
 //reset all modules
 void resetCPU(){
@@ -29,7 +32,7 @@ void resetCPU(){
 	delay(PULSE_DURATION);
 	digitalWrite(CPU_RESET, LOW);
 
-	//Check if CPU reset worked properly and repeat if necessary
+	//Check if CPU reset worked properly and repeat if necessary.
 	int resetCounter = 2;
 	while(digitalRead(COUNTER_0)){
 		Serial.println("CPU Reset Attempt#"+resetCounter);
@@ -41,7 +44,7 @@ void resetCPU(){
 	Serial.println("CPU Reset Successful");
 }
 
-//shift 4 bits to SR2 and latch to memory address register
+//shift 4 bits to SR2 and latch to memory address register.
 void setMemoryAddress(byte address){
 	
 	digitalWrite(SR2_LATCH, LOW);
@@ -59,7 +62,7 @@ void setMemoryAddress(byte address){
 	Serial.print(outputText+": ");
 }
 
-//shift 8 bits to SR1 and latch to memory data
+//shift 8 bits to SR1 and latch to memory data.
 void writeToRAM(byte data){
 	
 	digitalWrite(SR1_LATCH, LOW);
@@ -84,6 +87,7 @@ void writeToRAM(byte data){
 void setup() {
 	//initalize serial connection
 	Serial.begin(9600);
+	Serial.println("\n");
 
 	//initialize pins
 	pinMode(CPU_RESET, OUTPUT);
@@ -104,12 +108,23 @@ void setup() {
 	pinMode(CONFIRM_BUTTON, INPUT);
 	pinMode(MEM_WRITE, INPUT);
 	pinMode(COUNTER_0, INPUT);
+	pinMode(CLOCK_STOP, INPUT);
+	pinMode(PROG_MODE, INPUT);
 
-	//notify user, wait for user prompt
-	Serial.println("\n\nPlease switch Clock to manual and Memory to programming mode.");
+	//notify user to disable the clock and switch to programming mode.
+	//program execution will not continue unless these conditions are satisfied.
+	checkProgramMode = (analogRead(CLOCK_STOP) < 410 && analogRead(PROG_MODE) < 410) ? true : false;
+	if(!checkProgramMode)
+		Serial.println("Please switch Clock to manual and Memory to programming mode.");
+	while(!checkProgramMode){
+		checkProgramMode = (analogRead(CLOCK_STOP) < 410 && analogRead(PROG_MODE) < 410) ? true : false;
+	}
+
+	//wait for user to ensure all DIP switches are in the ON (HIGH) position. These switches
+	//are inverted in Ben's design, hence moving them to the UP position disconnects them.
 	Serial.println("Ensure ALL DIP switches are in the ON (HIGH) position. Press button to continue.");
 
-	//loop until the user presses the button
+	//loop until the user presses the button.
 	confirmButton = digitalRead(CONFIRM_BUTTON);
 	while(confirmButton != 1){
 		confirmButton = digitalRead(CONFIRM_BUTTON);
@@ -117,7 +132,7 @@ void setup() {
 
 	resetCPU();
 
-	//disable memory address dip switch input
+	//disable memory address dip switch input.
 	Serial.println("\nProgramming the memory");
 	byte code[] = {224, 47, 116, 96, 63, 224, 128, 100, 0, 0, 0, 0, 0, 0, 0, 1};
 	for (int address = 0; address < 16; address++){
@@ -126,6 +141,7 @@ void setup() {
 		delay(10);
 	}
 
+	//disable shift register latches, and reset all modules again.
 	digitalWrite(SR1_LATCH, LOW);
 	digitalWrite(SR2_LATCH, LOW);
 	resetCPU();
