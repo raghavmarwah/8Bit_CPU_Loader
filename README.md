@@ -4,7 +4,7 @@ This is an Arduino Nano based program loader for [Ben Eater's 8bit TTL CPU](http
 <br><br>
 I have been learning PCB design and would like to convert this project to a PCB build in the near future. One of the things I wanted to add was a program loader that can automatically load programs into the memory on boot. Before implementing this on a PCB, I wanted to have a working prototype that connects with my Breadboard CPU. More details https://raghavmarwah.com/arduino-8bit-loader/
 <br><br>
-The build uses an Arduino Nano and two 74HC595 Shift Registers to shift out values for the memory address and data to their respective DIP switches. When using this program loader, please ensure all DIP swicthes are set to the HIGH (UP) position. These switches are inverted in Ben's design, hence moving them to the UP position disconnects them (from GND).
+The build uses an Arduino Nano and two 74HC595 Shift Registers to shift out values for the memory address and data to their respective DIP switches. When using this program loader, please ensure all DIP switches are set to the HIGH (UP) position. These switches are inverted in Ben's design, hence moving them to the UP position disconnects them (from GND).
 <br><br>
 I use a 3rd party platform called PlatformIO for writing Arduino programs in VS Code. But you can simply copy the code from src/main.cpp and run that in the Arduino IDE.
 <br><br>
