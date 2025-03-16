@@ -2,7 +2,7 @@
 
 This is an Arduino Nano based program loader for [Ben Eater's 8bit TTL CPU](https://eater.net/8bit) project. I built the project on breadboards in the past. The CPU is fully programmable with 16 bytes of memory and 11 Op Codes that can be used to write programs, one instruction per byte. This programming has to be done manually using DIP switches every time the device is powered on. It is a bit tedious as you have to enter instructions in binary for each memory location by hand.
 <br><br>
-I have been learning PCB design and would like to convert this project to a PCB build in the near future. One of the things I wanted to add was a program loader that can automatically load programs into the memory on boot. Before implementing this on a PCB, I wanted to have a working prototype that connects with my Breadboard CPU. More details https://raghavmarwah.com/arduino-8bit-loader/
+I have been learning PCB design and would like to convert this project to a PCB build in the near future. One of the things I wanted to add was a program loader that can automatically load programs into the memory on boot. Before implementing this on a PCB, I wanted to have a working prototype that connects with my Breadboard CPU. More details https://raghavmarwah.com/blog/arduino-8bit-loader/
 <br><br>
 The build uses an Arduino Nano and two 74HC595 Shift Registers to shift out values for the memory address and data to their respective DIP switches. When using this program loader, please ensure all DIP switches are set to the HIGH (UP) position. These switches are inverted in Ben's design, hence moving them to the UP position disconnects them (from GND).
 <br><br>
